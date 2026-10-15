@@ -1,0 +1,242 @@
+﻿/* Tender Intelligence — Windows XP / SAP R/3 inspired theme */
+
+:root {
+    --xp-blue: #245edb;
+    --sap-blue: #315b7d;
+    --sap-panel: #d7e0e8;
+    --xp-face: #d4d0c8;
+    --xp-border-dark: #808080;
+    --xp-border-light: #ffffff;
+    --work-area: #f4f3ef;
+    --text-main: #202020;
+}
+
+/* Application canvas */
+.stApp {
+    background: var(--xp-face);
+    color: var(--text-main);
+    font-family: Tahoma, Verdana, sans-serif;
+    font-size: 13px;
+}
+
+/* Main content */
+section.main > div {
+    padding-top: 1rem;
+    padding-left: 1.2rem;
+    padding-right: 1.2rem;
+    max-width: 100%;
+}
+
+[data-testid="stMainBlockContainer"] {
+    background: var(--work-area);
+    border: 1px solid var(--xp-border-dark);
+    padding: 1rem 1.2rem 1.4rem;
+}
+
+/* Classic blue application title */
+.xp-titlebar {
+    background: linear-gradient(
+        180deg,
+        #3c80e8 0%,
+        #245edb 48%,
+        #1941a5 100%
+    );
+    color: #ffffff;
+    border: 1px solid #153783;
+    border-radius: 5px 5px 0 0;
+    padding: 10px 14px;
+    margin-bottom: 0;
+    font-family: Tahoma, Verdana, sans-serif;
+    font-weight: bold;
+    box-shadow: inset 1px 1px #8db8f5;
+}
+
+.xp-titlebar small {
+    display: block;
+    color: #e6efff;
+    font-size: 11px;
+    font-weight: normal;
+    margin-top: 3px;
+}
+
+/* SAP-style transaction strip */
+.sap-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    background: #d7e0e8;
+    border: 1px solid #8b9ba9;
+    border-top: 0;
+    padding: 7px 9px;
+    margin-bottom: 14px;
+    color: #173b5b;
+    font-size: 12px;
+}
+
+.sap-transaction {
+    background: #f8f8f5;
+    border: 1px inset #b8b8b8;
+    padding: 4px 9px;
+    font-family: Consolas, monospace;
+}
+
+/* Headings */
+h1, h2, h3 {
+    color: #234e73 !important;
+    font-family: Tahoma, Verdana, sans-serif !important;
+    letter-spacing: 0 !important;
+}
+
+h1 {
+    font-size: 1.55rem !important;
+}
+
+h2 {
+    font-size: 1.25rem !important;
+}
+
+h3 {
+    font-size: 1.05rem !important;
+}
+
+/* Raised Windows-style buttons */
+.stButton > button,
+.stDownloadButton > button,
+.stFormSubmitButton > button {
+    background: linear-gradient(180deg, #ffffff 0%, #e7e5df 48%, #d4d0c8 100%);
+    color: #202020;
+    border: 1px solid #77746d;
+    border-radius: 2px;
+    min-height: 31px;
+    padding: 4px 13px;
+    font-family: Tahoma, Verdana, sans-serif;
+    font-size: 12px;
+    box-shadow: inset 1px 1px #ffffff;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+.stFormSubmitButton > button:hover {
+    background: #e2ebf8;
+    color: #163f72;
+    border-color: #315b7d;
+}
+
+.stButton > button:focus,
+.stDownloadButton > button:focus,
+.stFormSubmitButton > button:focus {
+    outline: 1px dotted #202020;
+    outline-offset: -5px;
+}
+
+/* Inputs: classic recessed form fields */
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input,
+.stSelectbox div[data-baseweb="select"] > div {
+    background: #ffffff;
+    color: #202020;
+    border: 1px solid #858585;
+    border-radius: 1px;
+    font-family: Tahoma, Verdana, sans-serif;
+    font-size: 13px;
+}
+
+/* Panel framing */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 2px;
+    border-color: #a8a49b;
+}
+
+/* Data tables */
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+    border: 1px solid #9ba9b5;
+    border-radius: 1px;
+    background: #ffffff;
+}
+
+[data-testid="stDataFrame"] [role="columnheader"] {
+    background: #d7e0e8;
+    color: #173b5b;
+    font-weight: bold;
+}
+
+/* Expanders */
+[data-testid="stExpander"] {
+    background: #f8f7f3;
+    border: 1px solid #aaa69d;
+    border-radius: 2px;
+}
+
+/* Sidebar: classic grey navigation pane */
+[data-testid="stSidebar"] {
+    background: #d4d0c8;
+    border-right: 2px solid #aaa69d;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    background: #d4d0c8;
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: #234e73 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+    font-size: 12px;
+}
+
+/* Metrics: compact enterprise status panels */
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #a8b4be;
+    border-radius: 2px;
+    padding: 9px 11px;
+    box-shadow: inset 1px 1px #ffffff;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #4a5e70;
+    font-size: 12px;
+}
+
+[data-testid="stMetricValue"] {
+    color: #234e73;
+    font-family: Tahoma, Verdana, sans-serif;
+}
+
+/* Horizontal rules and code/evidence blocks */
+hr {
+    border-color: #b8b4ab;
+}
+
+[data-testid="stCode"] {
+    border: 1px solid #c0bcb3;
+    border-radius: 1px;
+}
+
+/* Status bar */
+.xp-statusbar {
+    border: 1px solid #aaa69d;
+    background: #e5e3dc;
+    color: #404040;
+    font-size: 11px;
+    padding: 5px 8px;
+    margin-top: 14px;
+}
+
+/* Keep controls usable on narrower screens */
+@media (max-width: 768px) {
+    section.main > div {
+        padding-left: 0.45rem;
+        padding-right: 0.45rem;
+    }
+
+    [data-testid="stMainBlockContainer"] {
+        padding: 0.7rem;
+    }
+}

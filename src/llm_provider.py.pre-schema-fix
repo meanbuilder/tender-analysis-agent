@@ -1,0 +1,124 @@
+﻿"""Google Gemini provider with structured output and safe error handling."""
+
+from __future__ import annotations
+
+import os
+from typing import Any, TypeVar
+
+from pydantic import BaseModel, ValidationError
+
+T = TypeVar("T", bound=BaseModel)
+
+
+class GeminiProviderError(RuntimeError):
+    """Base exception for Gemini provider failures."""
+
+
+class GeminiNotConfiguredError(GeminiProviderError):
+    """Raised when Gemini credentials are not configured."""
+
+
+class GeminiRequestError(GeminiProviderError):
+    """Raised when a Gemini request fails."""
+
+
+class GeminiResponseError(GeminiProviderError):
+    """Raised when Gemini returns an invalid structured response."""
+
+
+class GeminiProvider:
+    """Generate and validate structured responses using Google Gemini."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout_seconds: int = 30,
+        client: Any | None = None,
+    ) -> None:
+        configured_key = (
+            os.getenv("GEMINI_API_KEY", "").strip()
+            if api_key is None
+            else api_key.strip()
+        )
+
+        configured_model = model or os.getenv(
+            "GEMINI_MODEL", "gemini-3.5-flash"
+        )
+
+        if not 1 <= timeout_seconds <= 120:
+            raise ValueError("timeout_seconds must be between 1 and 120.")
+
+        if not configured_model.strip():
+            raise ValueError("The Gemini model name cannot be empty.")
+
+        self._api_key = configured_key
+        self.model = configured_model.strip()
+        self.timeout_seconds = timeout_seconds
+        self._client = client
+
+    @property
+    def is_configured(self) -> bool:
+        """Return whether an API key is available without exposing it."""
+        return bool(self._api_key)
+
+    def generate_structured(
+        self,
+        prompt: str,
+        response_model: type[T],
+    ) -> T:
+        """Generate JSON and validate it against a Pydantic model."""
+
+        if not self.is_configured:
+            raise GeminiNotConfiguredError(
+                "Gemini is not configured. Set GEMINI_API_KEY to enable AI."
+            )
+
+        if not prompt or not prompt.strip():
+            raise ValueError("prompt must not be empty.")
+
+        try:
+            from google import genai
+            from google.genai import types
+
+            if self._client is None:
+                self._client = genai.Client(
+                    api_key=self._api_key,
+                    http_options=types.HttpOptions(
+                        timeout=self.timeout_seconds * 1000
+                    ),
+                )
+
+            config = types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=response_model,
+            )
+
+            response = self._client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=config,
+            )
+
+            response_text = response.text
+
+            if not response_text or not response_text.strip():
+                raise GeminiResponseError(
+                    "Gemini returned an empty response."
+                )
+
+            return response_model.model_validate_json(response_text)
+
+        except GeminiResponseError:
+            raise
+        except ValidationError as exc:
+            raise GeminiResponseError(
+                "Gemini's response did not match the expected schema."
+            ) from exc
+        except Exception as exc:
+            raise GeminiRequestError(
+                "The Gemini request failed. Check network connectivity, "
+                "API credentials, model availability, quota, and timeout."
+            ) from exc
+
