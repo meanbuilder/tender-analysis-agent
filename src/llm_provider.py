@@ -8,6 +8,8 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from src.tender_system_prompt import TPP_TENDER_SYSTEM_PROMPT
+
 T = TypeVar("T", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
@@ -59,9 +61,7 @@ class GeminiProvider:
             else api_key.strip()
         )
 
-        configured_model = model or os.getenv(
-            "GEMINI_MODEL", "gemini-3.5-flash"
-        )
+        configured_model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
         if not 1 <= timeout_seconds <= 120:
             raise ValueError("timeout_seconds must be between 1 and 120.")
@@ -101,14 +101,15 @@ class GeminiProvider:
             if self._client is None:
                 self._client = genai.Client(
                     api_key=self._api_key,
-                    http_options=types.HttpOptions(
-                        timeout=self.timeout_seconds * 1000
-                    ),
+                    http_options=types.HttpOptions(timeout=self.timeout_seconds * 1000),
                 )
 
             config = types.GenerateContentConfig(
+                system_instruction=TPP_TENDER_SYSTEM_PROMPT,
                 response_mime_type="application/json",
-                response_schema=_sanitize_json_schema(response_model.model_json_schema()),
+                response_schema=_sanitize_json_schema(
+                    response_model.model_json_schema()
+                ),
             )
 
             response = self._client.models.generate_content(
@@ -120,9 +121,7 @@ class GeminiProvider:
             response_text = response.text
 
             if not response_text or not response_text.strip():
-                raise GeminiResponseError(
-                    "Gemini returned an empty response."
-                )
+                raise GeminiResponseError("Gemini returned an empty response.")
 
             return response_model.model_validate_json(response_text)
 
@@ -133,12 +132,12 @@ class GeminiProvider:
                 "Gemini's response did not match the expected schema."
             ) from exc
         except Exception as exc:
-            status_code = getattr(
-                exc, "status_code", getattr(exc, "code", None)
+            status_code = getattr(exc, "status_code", getattr(exc, "code", None))
+            error_message = (
+                str(getattr(exc, "message", type(exc).__name__))
+                .replace("\\n", " ")
+                .replace("\\r", " ")
             )
-            error_message = str(
-                getattr(exc, "message", type(exc).__name__)
-            ).replace("\\n", " ").replace("\\r", " ")
             if self._api_key:
                 error_message = error_message.replace(self._api_key, "[REDACTED]")
             error_message = error_message[:300]
@@ -159,4 +158,3 @@ class GeminiProvider:
                 "The Gemini request failed. Check network connectivity, "
                 "API credentials, model availability, quota, and timeout."
             ) from exc
-
