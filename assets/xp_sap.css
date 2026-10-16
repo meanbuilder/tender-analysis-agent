@@ -248,3 +248,93 @@ hr {
         padding: 7px;
     }
 }
+
+/* Targeted layout and light-theme correction */
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+[data-testid="stMainBlockContainer"],
+section.main,
+section.main > div {
+    background-color: #F4F3EF !important;
+    color: #202020 !important;
+    box-sizing: border-box;
+}
+
+[data-testid="stMainBlockContainer"] {
+    width: 100%;
+    max-width: 100%;
+    padding-top: 1.5rem !important;
+}
+
+[data-testid="stMainBlockContainer"] [data-testid="stMarkdownContainer"],
+[data-testid="stMainBlockContainer"] label,
+[data-testid="stMainBlockContainer"] p,
+[data-testid="stMainBlockContainer"] li {
+    color: #202020;
+}
+
+.xp-titlebar {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 64px;
+    padding: 12px 16px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    color: #FFFFFF !important;
+}
+
+.xp-titlebar small {
+    line-height: 1.4;
+    color: #E6EFFF !important;
+}
+
+.sap-toolbar {
+    box-sizing: border-box;
+    width: 100%;
+    color: #173B5B !important;
+}
+
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div:first-child {
+    background-color: #D4D0C8 !important;
+}
+
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] li,
+[data-testid="stSidebar"] label {
+    color: #202020 !important;
+}
+
+[data-testid="stMetric"] {
+    background-color: #FFFFFF !important;
+}
+
+
+/* Fix clipped application title */
+[data-testid="stMainBlockContainer"] {
+    padding-top: 2rem !important;
+}
+
+[data-testid="stMarkdownContainer"]:has(.xp-titlebar) {
+    overflow: visible !important;
+    padding-top: 0.5rem !important;
+}
+
+.xp-titlebar {
+    position: relative;
+    top: 0;
+    height: auto !important;
+    min-height: 76px !important;
+    padding: 16px 18px !important;
+    margin-top: 0.5rem !important;
+    line-height: 1.5 !important;
+    overflow: visible !important;
+    white-space: normal !important;
+}
+
+.xp-titlebar small {
+    display: block;
+    margin-top: 5px !important;
+    line-height: 1.5 !important;
+}
