@@ -14,6 +14,21 @@ from openpyxl.worksheet.worksheet import Worksheet
 from src.boq_extractor import BOQItem
 from src.schemas import ParameterFinding, TenderAnalysisResult
 
+# This handles missing values in the exported excel workbook.
+MISSING_VALUE = "Not Available in Uploaded Documents"
+
+
+def display_missing_value(value):
+    """Convert missing text values into an explicit report status."""
+    if value is None:
+        return MISSING_VALUE
+
+    if isinstance(value, str) and not value.strip():
+        return MISSING_VALUE
+
+    return value
+
+
 REVIEW_REQUIRED_HEADER = "Review Required"
 REVIEW_REASON_HEADER = "Review Reason"
 
@@ -180,11 +195,11 @@ def _summary_rows(
                 finding.parameter_number,
                 finding.parameter_name,
                 finding.status.value,
-                finding.requirement_summary or "",
-                finding.costing_impact or "",
+                display_missing_value(finding.requirement_summary),
+                display_missing_value(finding.costing_impact),
                 finding.risk_level.value,
-                _source_pages(finding),
-                _source_documents(finding),
+                display_missing_value(_source_pages(finding)),
+                display_missing_value(_source_documents(finding)),
                 "Yes" if finding.review_required else "No",
                 finding.review_reason or "",
             ]
@@ -252,10 +267,10 @@ def _evidence_rows(
             rows.append(
                 [
                     finding.parameter_name,
-                    "",
-                    None,
-                    "",
-                    "",
+                    MISSING_VALUE,
+                    MISSING_VALUE,
+                    MISSING_VALUE,
+                    MISSING_VALUE,
                     finding.status.value,
                     finding.review_reason or "",
                 ]
