@@ -15,7 +15,7 @@ from src.boq_extractor import BOQItem
 from src.schemas import ParameterFinding, TenderAnalysisResult
 
 # This handles missing values in the exported excel workbook.
-MISSING_VALUE = "Not Available in Uploaded Documents"
+MISSING_VALUE = "Not available in uploaded documents."
 
 
 def display_missing_value(value):
@@ -48,9 +48,11 @@ def _append_excel_row(
     worksheet: Worksheet,
     values: Iterable[object],
 ) -> None:
-    """Append a sanitized row to a worksheet."""
-    worksheet.append([_sanitize_excel_value(value) for value in values])
-
+    """Append a sanitized row, replacing missing values explicitly."""
+    worksheet.append([
+        _sanitize_excel_value(display_missing_value(value))
+        for value in values
+    ])
 
 HEADERS: dict[str, list[str]] = {
     "summary": [

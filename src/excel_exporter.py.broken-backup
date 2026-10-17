@@ -1,0 +1,377 @@
+from pathlib import Path
+
+content = '''"""Create a traceable, five-sheet tender-analysis Excel workbook."""
+
+import re
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from io import BytesIO
+from pathlib import Path
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+from src.boq_extractor import BOQItem
+from src.schemas import ParameterFinding, TenderAnalysisResult
+
+MISSING_VALUE = "Not available in uploaded documents."
+REVIEW_REQUIRED_HEADER = "Review Required"
+REVIEW_REASON_HEADER = "Review Reason"
+
+# Excel/openpyxl rejects these XML control characters in cell strings.
+# Keep valid whitespace, multilingual text, and other Unicode characters.
+_ILLEGAL_EXCEL_CHARACTERS = re.compile(r"[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]")
+
+
+def display_missing_value(value: object) -> object:
+    """Replace missing values with an explicit report status."""
+    if value is None:
+        return MISSING_VALUE
+    if isinstance(value, str) and not value.strip():
+        return MISSING_VALUE
+    return value
+
+
+def _sanitize_excel_value(value: object) -> object:
+    """Remove Excel-incompatible control characters from string values."""
+    if isinstance(value, str):
+        return _ILLEGAL_EXCEL_CHARACTERS.sub("", value)
+    return value
+
+
+def _append_excel_row(
+    worksheet: Worksheet,
+    values: Iterable[object],
+) -> None:
+    """Append a sanitized row, marking missing values explicitly."""
+    worksheet.append([
+        _sanitize_excel_value(display_missing_value(value))
+        for value in values
+    ])
+
+
+HEADERS: dict[str, list[str]] = {
+    "summary": [
+        "Sr_No",
+        "Parameter",
+        "Status",
+        "Tender Requirement Summary",
+        "Costing Impact",
+        "Risk Level",
+        "Clause Page Reference",
+        "Source Documents",
+        REVIEW_REQUIRED_HEADER,
+        REVIEW_REASON_HEADER,
+    ],
+    "boq": [
+        "Item No.",
+        "Description",
+        "Quantity",
+        "Unit",
+        "Unit Price",
+        "Total Price",
+        "Source Document",
+        "Source Page",
+        REVIEW_REQUIRED_HEADER,
+        REVIEW_REASON_HEADER,
+    ],
+    "risks": [
+        "Parameter",
+        "Status",
+        "Risk Level",
+        "Risk Description",
+        "Source Documents",
+        "Source Pages",
+        REVIEW_REQUIRED_HEADER,
+    ],
+    "evidence": [
+        "Parameter",
+        "Source Document",
+        "Page",
+        "Clause Reference",
+        "Evidence Text",
+        "Finding Status",
+        REVIEW_REASON_HEADER,
+    ],
+    "annexure": [
+        "Field",
+        "Value / Preparation Notes",
+        "Verification Status",
+    ],
+}
+
+
+def _source_pages(finding: ParameterFinding) -> str:
+    """Format unique source references without losing document names."""
+    references = (
+        f"{item.filename}, page {item.page_number}" for item in finding.evidence
+    )
+    return "; ".join(dict.fromkeys(references))
+
+
+def _source_documents(finding: ParameterFinding) -> str:
+    """Return unique source filenames in evidence order."""
+    filenames = (item.filename for item in finding.evidence)
+    return "; ".join(dict.fromkeys(filenames))
+
+
+def _style_sheet(worksheet: Worksheet) -> None:
+    """Apply readable headers, wrapping, filters, and column widths."""
+    header_fill = PatternFill("solid", fgColor="176B70")
+    header_font = Font(color="FFFFFF", bold=True)
+
+    worksheet.freeze_panes = "A2"
+    worksheet.auto_filter.ref = worksheet.dimensions
+    worksheet.sheet_view.showGridLines = False
+
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(
+            vertical="center",
+            horizontal="left",
+            wrap_text=True,
+        )
+
+    worksheet.row_dimensions[1].height = 32
+
+    for column_cells in worksheet.columns:
+        if not column_cells:
+            continue
+        column_index = column_cells[0].column
+        if column_index is None:
+            continue
+        column_letter = get_column_letter(column_index)
+
+        max_length = max(
+            (len(str(cell.value)) for cell in column_cells if cell.value is not None),
+            default=10,
+        )
+        worksheet.column_dimensions[column_letter].width = min(
+            max(max_length + 2, 14),
+            55,
+        )
+
+        for cell in column_cells[1:]:
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+
+def _add_table_sheet(
+    workbook: Workbook,
+    title: str,
+    headers: Iterable[object],
+    rows: Iterable[Iterable[object]],
+) -> None:
+    """Create, populate, and style a worksheet."""
+    worksheet = workbook.create_sheet(title)
+    _append_excel_row(worksheet, headers)
+    for row in rows:
+        _append_excel_row(worksheet, row)
+    _style_sheet(worksheet)
+
+
+def _summary_rows(result: TenderAnalysisResult) -> list[list[object]]:
+    """Build the tender's parameter summary rows."""
+    rows: list[list[object]] = []
+    findings = sorted(result.findings, key=lambda finding: finding.parameter_number)
+
+    for finding in findings:
+        rows.append([
+            finding.parameter_number,
+            finding.parameter_name,
+            finding.status.value,
+            display_missing_value(finding.requirement_summary),
+            display_missing_value(finding.costing_impact),
+            finding.risk_level.value,
+            display_missing_value(_source_pages(finding)),
+            display_missing_value(_source_documents(finding)),
+            "Yes" if finding.review_required else "No",
+            finding.review_reason or "",
+        ])
+    return rows
+
+
+def _boq_rows(items: Iterable[BOQItem]) -> list[list[object]]:
+    """Build BOQ rows from extracted candidate items."""
+    rows: list[list[object]] = []
+    for item in items:
+        rows.append([
+            display_missing_value(item.item_number),
+            display_missing_value(item.description),
+            float(item.quantity) if item.quantity is not None else MISSING_VALUE,
+            display_missing_value(item.unit),
+            float(item.unit_price) if item.unit_price is not None else MISSING_VALUE,
+            float(item.total_price) if item.total_price is not None else MISSING_VALUE,
+            display_missing_value(item.source_filename),
+            display_missing_value(item.source_page),
+            "Yes" if item.review_required else "No",
+            display_missing_value(item.review_reason),
+        ])
+    return rows
+
+
+def _risk_rows(result: TenderAnalysisResult) -> list[list[object]]:
+    """Include findings flagged for manual review."""
+    rows: list[list[object]] = []
+    for finding in result.findings:
+        if not finding.review_required:
+            continue
+        rows.append([
+            finding.parameter_name,
+            finding.status.value,
+            finding.risk_level.value,
+            display_missing_value(finding.review_reason or "Manual review required."),
+            display_missing_value(_source_documents(finding)),
+            display_missing_value("; ".join(str(item.page_number) for item in finding.evidence)),
+            "Yes",
+        ])
+    return rows
+
+
+def _evidence_rows(result: TenderAnalysisResult) -> list[list[object]]:
+    """Export source excerpts alongside their parameter context."""
+    rows: list[list[object]] = []
+    for finding in result.findings:
+        if not finding.evidence:
+            rows.append([
+                finding.parameter_name,
+                MISSING_VALUE,
+                MISSING_VALUE,
+                MISSING_VALUE,
+                MISSING_VALUE,
+                finding.status.value,
+                display_missing_value(finding.review_reason),
+            ])
+            continue
+
+        for evidence in finding.evidence:
+            rows.append([
+                finding.parameter_name,
+                display_missing_value(evidence.filename),
+                evidence.page_number,
+                display_missing_value(evidence.clause_reference),
+                display_missing_value(evidence.quoted_text),
+                finding.status.value,
+                display_missing_value(finding.review_reason),
+            ])
+    return rows
+
+
+def _annexure_rows(result: TenderAnalysisResult) -> list[list[object]]:
+    """Prepare Annexure 8 fields without asserting unverified compliance."""
+    return [
+        [
+            "NIT / Bid Number",
+            result.tender_reference or "To be entered from the tender",
+            "Requires verification",
+        ],
+        [
+            "Manufacturer / Bidder Name",
+            "To be completed by the authorized responsible person",
+            "Not verified",
+        ],
+        [
+            "Local Content Percentage",
+            "Not calculated. Obtain verified local-content cost data.",
+            "Not calculated",
+        ],
+        [
+            "Class-I Local Supplier Eligibility",
+            "Verify applicable tender conditions and current rules.",
+            "Requires authorized review",
+        ],
+        [
+            "Declaration Text",
+            "Insert the exact prescribed declaration from the tender.",
+            "Source text required",
+        ],
+        [
+            "Authorized Signatory",
+            "To be completed and signed by the authorized person.",
+            "Pending",
+        ],
+        [
+            "Supporting Records",
+            "List verified cost records and supporting evidence.",
+            "Pending",
+        ],
+        [
+            "Preparation Timestamp (UTC)",
+            datetime.now(UTC).isoformat(),
+            "Generated automatically",
+        ],
+    ]
+
+
+def create_tender_workbook(
+    result: TenderAnalysisResult,
+    boq_items: list[BOQItem] | None = None,
+) -> Workbook:
+    """Create the five-sheet tender workbook in memory."""
+    workbook = Workbook()
+
+    summary = workbook.active
+    if summary is None:
+        raise RuntimeError("Unable to create the tender summary worksheet.")
+    summary.title = "Tender Summary"
+    _append_excel_row(summary, HEADERS["summary"])
+    for row in _summary_rows(result):
+        _append_excel_row(summary, row)
+    _style_sheet(summary)
+
+    _add_table_sheet(
+        workbook,
+        "BOQ and Technical Items",
+        HEADERS["boq"],
+        _boq_rows(boq_items or []),
+    )
+    _add_table_sheet(
+        workbook,
+        "Compliance and Risk Register",
+        HEADERS["risks"],
+        _risk_rows(result),
+    )
+    _add_table_sheet(
+        workbook,
+        "Evidence and Exceptions",
+        HEADERS["evidence"],
+        _evidence_rows(result),
+    )
+    _add_table_sheet(
+        workbook,
+        "Make in India - Annexure 8",
+        HEADERS["annexure"],
+        _annexure_rows(result),
+    )
+    return workbook
+
+
+def export_tender_workbook(
+    result: TenderAnalysisResult,
+    output_path: str | Path,
+    boq_items: list[BOQItem] | None = None,
+) -> Path:
+    """Save the workbook to disk and return its destination path."""
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    workbook = create_tender_workbook(result, boq_items)
+    workbook.save(path)
+    return path
+
+
+def workbook_to_bytes(
+    result: TenderAnalysisResult,
+    boq_items: list[BOQItem] | None = None,
+) -> bytes:
+    """Serialize the workbook for an in-memory download."""
+    workbook = create_tender_workbook(result, boq_items)
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+'''
+
+output_path = Path("/mnt/data/excel_exporter.py")
+
+print(f"Created {output_path} ({len(content.splitlines())} lines)")
